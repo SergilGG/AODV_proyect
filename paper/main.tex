@@ -1,0 +1,132 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{float} 
+\geometry{a4paper, margin=2.54cm}
+
+\title{Simulación de Eventos Discretos del Protocolo AODV}
+\author{Sergio Gil Guerrero García}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Resumen del Proyecto}
+El presente proyecto implementa una simulación de eventos discretos del protocolo de enrutamiento reactivo AODV (Ad-hoc On-Demand Distance Vector) \cite{perkins1999ad, sciencedirect_aodv} utilizando el lenguaje Python y la biblioteca SimPy \cite{simpy_docs}. El objetivo principal es aislar la capa de red (Capa 3 del modelo OSI), abstrayendo la capa MAC y el medio físico, para evaluar de manera pura la lógica de descubrimiento, establecimiento de rutas y reenvío de datos (forwarding) en una topología de red inalámbrica estática y dispersa. 
+
+El código fuente completo de este simulador, así como la herramienta de visualización gráfica desarrollada, se encuentran disponibles de manera pública en el siguiente repositorio: \url{https://github.com/SergilGG/AODV_proyect}
+
+\section{Modelo Topológico y Espacial}
+La red se modela en un área de $100 \times 100$ unidades de distancia. Se despliegan 20 nodos de forma pseudoaleatoria (garantizando reproducibilidad mediante la semilla de inicialización 42). Matemáticamente, los nodos son tratados como puntos adimensionales en el espacio. Por lo tanto, cabe destacar que aunque en las representaciones gráficas de este documento los nodos se dibujen con un tamaño visual para facilitar su identificación, el hecho de que se toquen o superpongan visualmente no significa que tengan conexión. Los enlaces físicos se determinan estrictamente calculando la distancia euclidiana entre las coordenadas centrales $(x, y)$ de cada par de nodos; solo si esta distancia es menor o igual al radio de cobertura de la antena ($r = 35$), se consideran 'vecinos físicos' y pueden intercambiar mensajes.
+
+\section{Estructura y Comportamiento del Nodo}
+Cada nodo opera como de manera independiente y concurrente dentro del entorno de SimPy. Contiene tres estructuras de datos fundamentales para el funcionamiento de AODV \cite{rfc3561}:
+\begin{itemize}
+    \item \textbf{neighbors:} Lista estática de nodos accesibles a 1 salto físico.
+    \item \textbf{routing\_table:} Diccionario dinámico que mapea el ID del destino hacia el siguiente salto y la cantidad de saltos.
+    \item \textbf{seen\_rreqs:} Conjunto que actúa como memoria caché para evitar la retransmisión cíclica de paquetes de control (prevención de saturación de broadcast).
+\end{itemize}
+
+\section{Fases de Operación del Protocolo AODV Simulado} \cite{maurya2012overview, chakeres2004aodv, gaona2018implementation}
+\subsection{Fase Cero: Mantenimiento de Vecindad (mensajes HELLO)}
+De manera concurrente, todos los nodos ejecutan una corrutina que emite mensajes periódicos tipo HELLO cada 2.0 segundos simulados. Esto permite que los nodos llenen sus tablas de enrutamiento iniciales a 1 salto de distancia.
+
+\subsection{Fase Uno: Descubrimiento de Ruta (mensajes RREQ)}
+Al requerir comunicación con un destino desconocido, el origen inicializa una inundación (flooding) enviando un paquete RREQ. Los nodos intermedios verifican si el paquete es repetido; si es nuevo, establecen una Ruta Reversa hacia el origen, incrementan el contador de saltos y retransmiten el paquete vía broadcast.
+
+\subsection{Fase Dos: Respuesta de Ruta (mensajes RREP)}
+Una vez que el RREQ alcanza al destino, este genera un paquete unicast RREP dirigido al origen, utilizando la Ruta Reversa. A medida que el RREP salta de regreso, cada nodo intermedio guarda la Ruta Directa hacia el destino final.
+
+\subsection{Fase Tres: Transmisión de Datos}
+La recepción del RREP en el nodo origen actúa como disparador para transmitir un paquete de carga (DATA). El enrutamiento es descentralizado; cada nodo intermedio inspecciona la cabecera, consulta su tabla local y ejecuta una transición de estado en SimPy para inyectar el paquete al siguiente salto.
+
+\section{Resultados de la Simulación}
+Para demostrar la eficacia del modelo, se registró la bitácora de eventos generada por SimPy. A continuación se presenta la salida de consola obtenida al ejecutar los dos escenarios de prueba (ruta exitosa hacia el nodo 19 y ruta fallida hacia el nodo aislado 16):
+
+\begin{verbatim}
+Nodo 00 posicionado en (63.9, 2.5) -> Vecinos (4): [3, 4, 9, 11]
+Nodo 01 posicionado en (27.5, 22.3) -> Vecinos (6): [4, 5, 6, 11, 13, 17]
+Nodo 02 posicionado en (73.6, 67.7) -> Vecinos (6): [7, 10, 14, 15, 18, 19]
+Nodo 03 posicionado en (89.2, 8.7) -> Vecinos (3): [0, 9, 12]
+Nodo 04 posicionado en (42.2, 3.0) -> Vecinos (4): [0, 1, 11, 13]
+Nodo 05 posicionado en (21.9, 50.5) -> Vecinos (3): [1, 8, 17]
+Nodo 06 posicionado en (2.7, 19.9) -> Vecinos (3): [1, 11, 13]
+Nodo 07 posicionado en (65.0, 54.5) -> Vecinos (7): [2, 10, 14, 15, 17, 18, 19]
+Nodo 08 posicionado en (22.0, 58.9) -> Vecinos (2): [5, 17]
+Nodo 09 posicionado en (80.9, 0.6) -> Vecinos (2): [0, 3]
+Nodo 10 posicionado en (80.6, 69.8) -> Vecinos (6): [2, 7, 14, 15, 18, 19]
+Nodo 11 posicionado en (34.0, 15.5) -> Vecinos (5): [0, 1, 4, 6, 13]
+Nodo 12 posicionado en (95.7, 33.7) -> Vecinos (4): [3, 14, 18, 19]
+Nodo 13 posicionado en (9.3, 9.7) -> Vecinos (4): [1, 4, 6, 11]
+Nodo 14 posicionado en (84.7, 60.4) -> Vecinos (7): [2, 7, 10, 12, 15, 18, 19]
+Nodo 15 posicionado en (80.7, 73.0) -> Vecinos (6): [2, 7, 10, 14, 18, 19]
+Nodo 16 posicionado en (53.6, 97.3) -> Vecinos (0): []
+Nodo 17 posicionado en (37.9, 55.2) -> Vecinos (4): [1, 5, 7, 8]
+Nodo 18 posicionado en (82.9, 61.9) -> Vecinos (7): [2, 7, 10, 12, 14, 15, 19]
+Nodo 19 posicionado en (86.2, 57.7) -> Vecinos (7): [2, 7, 10, 12, 14, 15, 18]
+===================================================================================
+[1.00] Nodo 0 inicia busqueda hacia Nodo 19
+[1.30] RUTA COMPLETADA! Nodo 0 llego al Nodo 19 en 3 saltos.
+[1.30] [DATOS] Nodo 0 inicia transmision de DATOS. Siguiente salto: Nodo 3
+[1.35] [DATOS] Nodo 3 reenvia paquete de DATOS hacia Nodo 12
+[1.40] [DATOS] Nodo 12 reenvia paquete de DATOS hacia Nodo 19
+[1.45] EXITO DE TRANSMISION! Nodo 19 recibio el paquete de DATOS.
+    - Mensaje: 'Hola desde el nodo origen, validando la ruta calculada.'
+    - Ruta real recorrida: [0, 3, 12, 19]
+
+================= RUTAS =============================
+EXITO: El Nodo 0 encontro al Nodo 19.
+Siguiente salto inicial: Nodo 3
+Distancia total en tabla: 3 saltos.
+===================================================================================
+[16.00] Nodo 0 inicia busqueda hacia Nodo 16
+
+================= RUTAS =============================
+FALLO: No se encontro ruta en el tiempo establecido.
+\end{verbatim}
+
+\subsection{Análisis de los Escenarios}
+\begin{itemize}
+    \item \textbf{Escenario Ideal o ``Happy Path'' (Nodo 0 al 19):} En ingeniería de software y telecomunicaciones, el \textit{Happy Path} define el flujo de ejecución donde no ocurren excepciones o errores. Como se observa en la bitácora, el algoritmo convergió en 1.30 segundos simulados, donde la ruta exacta es: $[0 \rightarrow 3 \rightarrow 12 \rightarrow 19]$.
+    \item \textbf{Caso de Aislamiento (Nodo 0 al 16):} Para evaluar la robustez contra bucles, se buscó el Nodo 16, el cual no posee vecinos físicos. La red contuvo la propagación eficientemente y reportó el fallo de enrutamiento, validando el mecanismo de finalización del protocolo.
+\end{itemize}
+
+\section{Visualización Gráfica de la Topología (Tkinter)}
+Para validar el modelo espacial utilizado en SimPy, se desarrolló una interfaz gráfica utilizando la biblioteca \texttt{Tkinter}. Esta herramienta aísla las variables del entorno en tres imágenes que explican el proceso de enrutamiento:
+
+\subsection{Imagen 1: Radios de Cobertura}
+Esta vista despliega el plano cartesiano con una cuadrícula de referencia. Se grafica el área de cobertura circular de cada nodo ($r = 35$). Esta capa demuestra empíricamente por qué ciertos nodos pueden comunicarse y justifica el fallo intencional del Nodo 16, cuyo radio de cobertura no logra intersectar con ningún otro nodo de la red.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{imagen0_cobertura.png}
+\caption{Radios de cobertura de los nodos.}
+\end{figure}
+
+\subsection{Imagen 2: Conexiones Físicas}
+Al omitir los radios de cobertura, esta capa traza líneas de conexión (aristas) estrictamente entre aquellos nodos que cumplen con la condición de distancia euclidiana. Representa el grafo no dirigido sobre el cual el protocolo AODV realiza la inundación de mensajes RREQ.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{imagen1_conexiones.png}
+\caption{Grafo de conexiones físicas posibles.}
+\end{figure}
+
+\subsection{Imagen 3: Ruta Óptima (Happy Path)}
+Sobre la red de conexiones físicas, esta vista resalta mediante vectores direccionales la ruta final calculada por el simulador. Permite observar cómo el protocolo seleccionó los saltos más eficientes para hacer llegar el paquete de datos del origen al destino.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{imagen2_happypath.png}
+\caption{Ruta exitosa calculada por el protocolo AODV.}
+\end{figure}
+
+\newpage
+\bibliographystyle{ieeetr}
+\bibliography{ref}
+
+\end{document}
