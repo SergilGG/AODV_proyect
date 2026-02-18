@@ -1,0 +1,28 @@
+# created by virtualenv automatically
+.venv/
+venv/
+ENV/
+env/
+
+.env
+
+.idea/
+
+__pycache__/
+*.py[cod]
+
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+
